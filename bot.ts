@@ -1,6 +1,7 @@
 import { GatewayDispatchEvents } from 'discord-api-types/v10';
 import { ClientQuest } from './src/client';
-import { Utils } from './src/utils';
+import { stealthClaimAll } from './src/claimStealth';
+import { humanDelay, randMs } from './src/stealth';
 
 let currentUserId: string | null = null;
 
@@ -31,21 +32,20 @@ client.once(GatewayDispatchEvents.Ready, async ({ data, api }) => {
 	await client.fetchQuests(false);
 	const questsValid = client.questManager!.filterQuestsValidToDo();
 	console.log(`Found ${questsValid.length} valid quests to do.`);
-	await Promise.allSettled(
-		questsValid.map((quest) => client.questManager!.doingQuest(quest)),
-	);
 
-	// ! Redeem rewards for completed quests
-	// Todo: Cache quests
-	/*
-	await client.fetchQuests(false);
-	const questsToRedeem = client.questManager!.filterQuestsValidToRedeem();
-	console.log(`Found ${questsToRedeem.length} quests to redeem rewards for.`);
-	for (const quest of questsToRedeem) {
-		await client.questManager!.redeemQuest(quest);
+	for (const quest of questsValid) {
+		try {
+			await client.questManager!.doingQuest(quest);
+		} catch (err: any) {
+			console.error(`Failed quest "${quest.id}":`, err?.message ?? err);
+		}
+		if (questsValid.indexOf(quest) < questsValid.length - 1) {
+			await humanDelay(randMs(10_000, 30_000));
+		}
 	}
-	*/
-	// Disconnect
+
+	await stealthClaimAll(client);
+
 	console.log('All quests processed. Disconnecting...');
 	await client.destroy();
 });

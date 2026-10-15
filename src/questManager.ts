@@ -184,11 +184,12 @@ export class QuestManager implements Iterable<Quest> {
 		retry = 0,
 		captchaHeaders?: Record<string, string>,
 	): Promise<void> {
-		if (retry === 3) {
+		const MAX_RETRIES = 5;
+		if (retry >= MAX_RETRIES) {
 			console.error(
 				`Failed to redeem quest "${quest.config.messages.quest_name}" after ${retry} attempts.`,
 			);
-			return;
+			throw new Error(`redeem-retries-exhausted:${quest.id}`);
 		}
 		if (!quest.isCompleted()) {
 			console.error(`Cannot redeem rewards for an incomplete quest.`);
@@ -242,7 +243,7 @@ export class QuestManager implements Iterable<Quest> {
 			);
 			quest.updateUserStatus(res);
 		} catch (err: any) {
-			const rawError = err.rawError as CaptchaDataFromRequest;
+			const rawError = (err?.rawError ?? {}) as CaptchaDataFromRequest;
 			if (rawError['captcha_key'] && rawError['captcha_sitekey']) {
 				console.warn(
 					`Captcha required to redeem rewards for quest "${quest.config.messages.quest_name}".`,
@@ -263,6 +264,7 @@ export class QuestManager implements Iterable<Quest> {
 					`Failed to redeem rewards for quest "${quest.config.messages.quest_name}".`,
 					err.message,
 				);
+				throw err;
 			}
 		}
 	}
