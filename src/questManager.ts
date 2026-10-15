@@ -246,14 +246,17 @@ export class QuestManager implements Iterable<Quest> {
 			const rawError = (err?.rawError ?? {}) as CaptchaDataFromRequest;
 			if (rawError['captcha_key'] && rawError['captcha_sitekey']) {
 				console.warn(
-					`Captcha required to redeem rewards for quest "${quest.config.messages.quest_name}".`,
-					rawError,
+					`Captcha required to redeem rewards for quest "${quest.config.messages.quest_name}". sitekey=${rawError['captcha_sitekey']}`,
 				);
-				const solvedCaptchaKey = await solveCaptcha(rawError);
-				console.log(
-					`Captcha Key solved: ${solvedCaptchaKey.slice(0, 30)}<0,30>. Retrying reward redemption...`,
-				);
-				// Todo: Fix "Unknown Message" error when solving captcha for quest rewards claiming.
+				let solvedCaptchaKey: string;
+				try {
+					solvedCaptchaKey = await solveCaptcha(rawError);
+				} catch (solveErr: any) {
+					console.error(`[Captcha] Solve failed:`, solveErr?.message ?? solveErr);
+					throw solveErr;
+				}
+				console.log(`Captcha solved. Retrying reward redemption...`);
+				await this.timeout(5000 + Math.random() * 10000);
 				return this.redeemQuest(quest, retry + 1, {
 					'x-captcha-key': solvedCaptchaKey,
 					'x-captcha-rqtoken': rawError['captcha_rqtoken'],

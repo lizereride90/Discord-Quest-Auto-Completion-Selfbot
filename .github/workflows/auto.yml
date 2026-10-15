@@ -42,6 +42,7 @@ jobs:
               env:
                   TOKEN: ${{ secrets.TOKEN }}
                   WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
+                  YES_CAPTCHA_API_KEY: ${{ secrets.YES_CAPTCHA_API_KEY }}
               run: |
                   npm run github
 
@@ -50,5 +51,6 @@ jobs:
               env:
                   TOKEN: ${{ secrets.TOKEN }}
                   WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
+                  YES_CAPTCHA_API_KEY: ${{ secrets.YES_CAPTCHA_API_KEY }}
               run: |
                   npm run claim
