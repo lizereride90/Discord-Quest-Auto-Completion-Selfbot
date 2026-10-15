@@ -1,7 +1,6 @@
 import { Constants } from './constants';
 import { CaptchaDataFromRequest } from './interface';
 import { YesCaptchaSolver } from './providers/yescaptcha';
-import { Utils } from './utils';
 
 function getSolver(): YesCaptchaSolver | null {
 	const key = (process.env.YES_CAPTCHA_API_KEY ?? '').trim();
@@ -10,18 +9,35 @@ function getSolver(): YesCaptchaSolver | null {
 }
 
 export function isCaptchaSolvingEnabled(): boolean {
+	if ((process.env.CAPTCHA_TOKEN ?? '').trim()) return true;
 	return Boolean((process.env.YES_CAPTCHA_API_KEY ?? '').trim());
 }
 
+export function isCaptchaError(err: any): boolean {
+	const msg = String(err?.message ?? '').toLowerCase();
+	return (
+		msg.includes('captcha') ||
+		msg.includes('captcha-required') ||
+		Boolean(err?.rawError?.captcha_sitekey)
+	);
+}
+
 export async function solveCaptcha(data: CaptchaDataFromRequest): Promise<string> {
+	const manual = (process.env.CAPTCHA_TOKEN ?? '').trim();
+	if (manual) {
+		console.log('[Captcha] Using manual CAPTCHA_TOKEN from env.');
+		return manual;
+	}
 	const solver = getSolver();
 	if (!solver) {
-		throw new Error(
-			'Captcha required but YES_CAPTCHA_API_KEY is missing. Set it in .env (local) or repo secrets (workflow) to enable solving.',
+		const err: any = new Error(
+			'Captcha required but no solver configured. Set CAPTCHA_TOKEN (free, manual) or YES_CAPTCHA_API_KEY (paid). Skipping quest.',
 		);
+		err.code = 'CAPTCHA_UNCONFIGURED';
+		throw err;
 	}
 	console.log(
-		`[Captcha] Solving hcaptcha sitekey=${data.captcha_sitekey} service=${data.captcha_service ?? 'hcaptcha'}...`,
+		`[Captcha] Solving hcaptcha sitekey=${data.captcha_sitekey}...`,
 	);
 	const result = await solver.hcaptcha(data.captcha_sitekey, 'https://discord.com', {
 		rqdata: data.captcha_rqdata,

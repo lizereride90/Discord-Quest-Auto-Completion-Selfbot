@@ -1,5 +1,6 @@
 import type { ClientQuest } from './client';
 import type { Quest } from './quest';
+import { isCaptchaError } from './captcha';
 import {
 	loadStealthConfig,
 	randMs,
@@ -70,6 +71,12 @@ async function claimOneWithRetry(
 			}
 			return { questId: quest.id, questName, claimed: true, skipped: null, attempts };
 		} catch (err: any) {
+			if (isCaptchaError(err) || (err as any)?.code === 'CAPTCHA_UNCONFIGURED') {
+				console.warn(
+					`[Claim] Skipping "${questName}" — captcha required, no free solver. Set CAPTCHA_TOKEN to claim it manually.`,
+				);
+				return { questId: quest.id, questName, claimed: false, skipped: 'captcha-required', attempts };
+			}
 			if (isRateLimit(err)) {
 				const wait = Math.min(
 					cfg.backoffMaxMs,
@@ -158,6 +165,12 @@ export async function stealthClaimAll(client: ClientQuest): Promise<ClaimResult[
 	}
 
 	const ok = results.filter((r) => r.claimed).length;
+	const captchaBlocked = results.filter((r) => r.skipped === 'captcha-required');
 	console.log(`[Claim] Done. Claimed ${ok}/${results.length}.`);
+	if (captchaBlocked.length > 0) {
+		console.log(
+			`[Claim] ${captchaBlocked.length} quest(s) need manual captcha: ${captchaBlocked.map((r) => `"${r.questName}"`).join(', ')}. Re-run with CAPTCHA_TOKEN set (free) to claim them.`,
+		);
+	}
 	return results;
 }
