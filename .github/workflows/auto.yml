@@ -1,9 +1,19 @@
 name: Run quest auto completion bot
 
 on:
-    workflow_dispatch: {}
+    workflow_dispatch:
+        inputs:
+            mode:
+                description: 'Run mode'
+                required: false
+                default: 'full'
+                type: choice
+                options:
+                    - full
+                    - claim-only
     schedule:
         - cron: '15 0 * * *'
+        - cron: '30 12 * * *'
 
 jobs:
     run-bot:
@@ -27,9 +37,18 @@ jobs:
                     npm install
                   fi
 
-            - name: Run the bot
+            - name: Run the bot (full)
+              if: ${{ inputs.mode != 'claim-only' && github.event.schedule != '30 12 * * *' }}
               env:
                   TOKEN: ${{ secrets.TOKEN }}
                   WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
               run: |
                   npm run github
+
+            - name: Claim unclaimed rewards (claim-only)
+              if: ${{ inputs.mode == 'claim-only' || github.event.schedule == '30 12 * * *' }}
+              env:
+                  TOKEN: ${{ secrets.TOKEN }}
+                  WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
+              run: |
+                  npm run claim
