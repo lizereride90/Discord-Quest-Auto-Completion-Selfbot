@@ -1,17 +1,9 @@
 import { Constants } from './constants';
 import { CaptchaDataFromRequest } from './interface';
-import { YesCaptchaSolver } from './providers/yescaptcha';
-
-function getSolver(): YesCaptchaSolver | null {
-	const key = (process.env.YES_CAPTCHA_API_KEY ?? '').trim();
-	if (!key) return null;
-	return new YesCaptchaSolver(key);
-}
-
-export function isCaptchaSolvingEnabled(): boolean {
-	if ((process.env.CAPTCHA_TOKEN ?? '').trim()) return true;
-	return Boolean((process.env.YES_CAPTCHA_API_KEY ?? '').trim());
-}
+import { CapSolverProvider } from './providers/capsolver';
+import { NoCaptchaAISolver } from './providers/nocaptchaai';
+import type { CaptchaProvider } from './providers/types';
+import { YesCaptchaProvider } from './providers/yescaptchaProvider';
 
 export function isCaptchaError(err: any): boolean {
 	const msg = String(err?.message ?? '').toLowerCase();
@@ -22,31 +14,59 @@ export function isCaptchaError(err: any): boolean {
 	);
 }
 
+function buildChain(): CaptchaProvider[] {
+	const chain: CaptchaProvider[] = [];
+	const nocaptcha = (process.env.NOCAPTCHA_API_KEY ?? '').trim();
+	const yescaptcha = (process.env.YES_CAPTCHA_API_KEY ?? '').trim();
+	const capsolver = (process.env.CAPSOLVER_API_KEY ?? '').trim();
+	if (nocaptcha) chain.push(new NoCaptchaAISolver(nocaptcha));
+	if (yescaptcha) chain.push(new YesCaptchaProvider(yescaptcha));
+	if (capsolver) chain.push(new CapSolverProvider(capsolver));
+	return chain;
+}
+
+export function isCaptchaSolvingEnabled(): boolean {
+	if ((process.env.CAPTCHA_TOKEN ?? '').trim()) return true;
+	return buildChain().length > 0;
+}
+
+export function listSolverNames(): string[] {
+	return buildChain().map((p) => p.name);
+}
+
 export async function solveCaptcha(data: CaptchaDataFromRequest): Promise<string> {
 	const manual = (process.env.CAPTCHA_TOKEN ?? '').trim();
 	if (manual) {
-		console.log('[Captcha] Using manual CAPTCHA_TOKEN from env.');
+		console.log('[Captcha] Using manual CAPTCHA_TOKEN from env (free).');
 		return manual;
 	}
-	const solver = getSolver();
-	if (!solver) {
+	const chain = buildChain();
+	if (chain.length === 0) {
 		const err: any = new Error(
-			'Captcha required but no solver configured. Set CAPTCHA_TOKEN (free, manual) or YES_CAPTCHA_API_KEY (paid). Skipping quest.',
+			'Captcha required but no solver configured. Free: set CAPTCHA_TOKEN (manual) or NOCAPTCHA_API_KEY (free signup balance). Paid: YES_CAPTCHA_API_KEY / CAPSOLVER_API_KEY.',
 		);
 		err.code = 'CAPTCHA_UNCONFIGURED';
 		throw err;
 	}
-	console.log(
-		`[Captcha] Solving hcaptcha sitekey=${data.captcha_sitekey}...`,
-	);
-	const result = await solver.hcaptcha(data.captcha_sitekey, 'https://discord.com', {
-		rqdata: data.captcha_rqdata,
-		isInvisible: false,
-		userAgent: Constants.USER_AGENT,
-	});
-	if (!result?.gRecaptchaResponse) {
-		throw new Error('Captcha solver returned an empty token.');
+	console.log(`[Captcha] Chain: ${chain.map((p) => p.name).join(' -> ')}. sitekey=${data.captcha_sitekey}`);
+	let lastErr: any = null;
+	for (const provider of chain) {
+		try {
+			console.log(`[Captcha] Trying ${provider.name}...`);
+			const token = await provider.solveHcaptcha({
+				sitekey: data.captcha_sitekey,
+				url: 'https://discord.com',
+				rqdata: data.captcha_rqdata,
+				isInvisible: false,
+				userAgent: Constants.USER_AGENT,
+			});
+			if (!token) throw new Error(`[${provider.name}] Empty token.`);
+			console.log(`[Captcha] Solved via ${provider.name}, len=${token.length}.`);
+			return token;
+		} catch (e: any) {
+			lastErr = e;
+			console.warn(`[Captcha] ${provider.name} failed:`, e?.message ?? e);
+		}
 	}
-	console.log(`[Captcha] Solved, token length=${result.gRecaptchaResponse.length}.`);
-	return result.gRecaptchaResponse;
+	throw lastErr ?? new Error('[Captcha] All solvers failed.');
 }

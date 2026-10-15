@@ -43,6 +43,9 @@ jobs:
                   TOKEN: ${{ secrets.TOKEN }}
                   WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
                   YES_CAPTCHA_API_KEY: ${{ secrets.YES_CAPTCHA_API_KEY }}
+                  NOCAPTCHA_API_KEY: ${{ secrets.NOCAPTCHA_API_KEY }}
+                  CAPSOLVER_API_KEY: ${{ secrets.CAPSOLVER_API_KEY }}
+                  CAPTCHA_TOKEN: ${{ secrets.CAPTCHA_TOKEN }}
               run: |
                   npm run github
 
@@ -52,5 +55,8 @@ jobs:
                   TOKEN: ${{ secrets.TOKEN }}
                   WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
                   YES_CAPTCHA_API_KEY: ${{ secrets.YES_CAPTCHA_API_KEY }}
+                  NOCAPTCHA_API_KEY: ${{ secrets.NOCAPTCHA_API_KEY }}
+                  CAPSOLVER_API_KEY: ${{ secrets.CAPSOLVER_API_KEY }}
+                  CAPTCHA_TOKEN: ${{ secrets.CAPTCHA_TOKEN }}
               run: |
                   npm run claim
