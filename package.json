@@ -6,8 +6,7 @@
   "scripts": {
     "start": "tsx --env-file=.env bot.ts",
     "dev": "tsx --env-file=.env --inspect-brk bot.ts",
-    "github": "tsx bot.ts",
-    "claim": "tsx claim.ts"
+    "github": "tsx bot.ts"
   },
   "keywords": [],
   "author": "aiko-chan-ai",
